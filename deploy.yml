@@ -1,22 +1,55 @@
-name: deploy to azure
+name: Build and deploy a container to an Azure Web App
 
 on:
   push:
     branches: [ main ]
 
+# 1. Ensure permissions are at the top level so the deploy job can use OIDC tokens
+permissions:
+  id-token: write
+  contents: read
+  packages: write
+
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
-    - name: checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: azure login
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: build and deploy
-      run: |
-        az acr build --registry learningcollective01 --image my-static-app .
-        az container create --resource-group learning-collective-rg --name learningcollective-app --image learningcollective01.azurecr.io/my-static-app:latest --cpu 1 --memory 1.0Gi --dns-name-label learningcollective --ports 3000
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build # Makes sure deploy only runs after build finishes successfully
+    
+    steps:
+      # 2. YOU NEED THIS LOGIN STEP INSIDE THE DEPLOY JOB
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # 3. Now the deploy action will find the credentials it needs
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'learningcollective-app' # Replace with your actual Azure App name if different
+          images: 'ghcr.io/${{ github.repository }}:latest'
