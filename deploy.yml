@@ -1,0 +1,22 @@
+name: deploy to azure
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout code
+      uses: actions/checkout@v3
+
+    - name: azure login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: build and deploy
+      run: |
+        az acr build --registry learningcollective01 --image my-static-app .
+        az container create --resource-group learning-collective-rg --name learningcollective-app --image learningcollective01.azurecr.io/my-static-app:latest --cpu 1 --memory 1.0Gi --dns-name-label learningcollective --ports 3000
