@@ -7,7 +7,7 @@ on:
 # 1. Ensure permissions are at the top level so the deploy job can use OIDC tokens
 permissions:
   id-token: write
-  contents: read
+  contents: write
   packages: write
 
 jobs:
