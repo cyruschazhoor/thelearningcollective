@@ -3,31 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { User, Tutor, Session, Question, Reply, Notification } from '../types';
 
-// Check if Supabase keys are configured
-const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
-const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
-
-export const isSupabaseConfigured = 
-  !!supabaseUrl && 
-  !!supabaseAnonKey && 
-  supabaseUrl !== 'https://your-project.supabase.co' && 
-  supabaseAnonKey !== 'your-anon-key';
-
-let supabase: SupabaseClient | null = null;
-
-if (isSupabaseConfigured) {
-  try {
-    supabase = createClient(supabaseUrl, supabaseAnonKey);
-  } catch (error) {
-    console.error('Failed to initialize Supabase client:', error);
-  }
-}
+export const isSupabaseConfigured = false;
 
 // ============================================================================
-// INITIAL MOCK DATA (Seeded for local preview or as a fallback)
+// INITIAL MOCK DATA (Seeded for local preview)
 // ============================================================================
 
 const INITIAL_TUTORS: Tutor[] = [
@@ -163,76 +144,24 @@ const initLocalDB = () => {
 initLocalDB();
 
 // ============================================================================
-// HELPER METHODS (Durable local fallbacks + real Supabase hooks)
+// HELPER METHODS (Durable Local Persistence Engine)
 // ============================================================================
 
 export const db = {
   // --- AUTHENTICATION ---
   async getCurrentUser(): Promise<User | null> {
-    if (isSupabaseConfigured && supabase) {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error || !user) return null;
-      
-      // Fetch user profile from public.profiles
-      const { data, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-        
-      if (!profileError && data) {
-        return data as User;
-      }
-      return {
-        id: user.id,
-        email: user.email || '',
-        fullName: user.user_metadata?.fullName || 'Student',
-        role: user.user_metadata?.role || 'student',
-        createdAt: user.created_at,
-      };
-    }
-
-    // Local Storage Fallback
     const currentSession = localStorage.getItem('lt_current_user');
     return currentSession ? JSON.parse(currentSession) : null;
   },
 
   async signUp(email: string, password: string, fullName: string, role: 'student' | 'tutor' | 'admin' = 'student'): Promise<User> {
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            fullName,
-            role,
-          }
-        }
-      });
-      if (error) throw error;
-      if (!data.user) throw new Error('Signup failed: user object is null');
-
-      const newUser: User = {
-        id: data.user.id,
-        email,
-        fullName,
-        role,
-        createdAt: new Date().toISOString()
-      };
-
-      // Real Supabase Insert into profiles table
-      await supabase.from('profiles').insert([newUser]);
-      return newUser;
-    }
-
-    // Local Storage Fallback
     const localUsers = JSON.parse(localStorage.getItem('lt_users') || '[]');
     if (localUsers.some((u: any) => u.email === email)) {
       throw new Error('An account with this email already exists.');
     }
 
     const newUser: User = {
-      id: 'usr-' + Math.random().toString(36).substr(2, 9),
+      id: 'usr-' + Math.random().toString(36).substring(2, 11),
       email,
       fullName,
       role,
@@ -255,30 +184,6 @@ export const db = {
   },
 
   async signIn(email: string, password: string): Promise<User> {
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      if (error) throw error;
-      if (!data.user) throw new Error('Signin failed: user object is null');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
-
-      return (profile || {
-        id: data.user.id,
-        email: data.user.email || '',
-        fullName: data.user.user_metadata?.fullName || 'Student',
-        role: data.user.user_metadata?.role || 'student',
-        createdAt: data.user.created_at,
-      }) as User;
-    }
-
-    // Local Storage Fallback
     const localUsers = JSON.parse(localStorage.getItem('lt_users') || '[]');
     const user = localUsers.find((u: any) => u.email === email);
     if (!user) {
@@ -294,41 +199,22 @@ export const db = {
   },
 
   async signOut(): Promise<void> {
-    if (isSupabaseConfigured && supabase) {
-      await supabase.auth.signOut();
-    }
     localStorage.removeItem('lt_current_user');
   },
 
   // --- TUTORS ---
   async getTutors(): Promise<Tutor[]> {
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('tutors')
-        .select('*')
-        .order('rating', { ascending: false });
-      if (!error && data) return data as Tutor[];
-    }
     return JSON.parse(localStorage.getItem('lt_tutors') || '[]');
   },
 
   // --- SESSIONS & BOOKINGS ---
   async getSessions(userId: string): Promise<Session[]> {
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('sessions')
-        .select('*')
-        .or(`studentId.eq.${userId},tutorId.eq.${userId}`)
-        .order('date', { ascending: true });
-      if (!error && data) return data as Session[];
-    }
-    
     const sessions = JSON.parse(localStorage.getItem('lt_sessions') || '[]');
     return sessions.filter((s: Session) => s.studentId === userId || s.tutorId === userId);
   },
 
   async bookSession(sessionData: Omit<Session, 'id' | 'createdAt' | 'status' | 'paymentStatus'>): Promise<Session> {
-    const id = 'sess-' + Math.random().toString(36).substr(2, 9);
+    const id = 'sess-' + Math.random().toString(36).substring(2, 11);
     const newSession: Session = {
       ...sessionData,
       id,
@@ -337,16 +223,6 @@ export const db = {
       createdAt: new Date().toISOString()
     };
 
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('sessions')
-        .insert([newSession])
-        .select()
-        .single();
-      if (!error && data) return data as Session;
-    }
-
-    // Local Storage Fallback
     const sessions = JSON.parse(localStorage.getItem('lt_sessions') || '[]');
     sessions.push(newSession);
     localStorage.setItem('lt_sessions', JSON.stringify(sessions));
@@ -371,17 +247,6 @@ export const db = {
   },
 
   async paySession(sessionId: string): Promise<Session> {
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('sessions')
-        .update({ paymentStatus: 'paid', status: 'confirmed' })
-        .eq('id', sessionId)
-        .select()
-        .single();
-      if (!error && data) return data as Session;
-    }
-
-    // Local Storage Fallback
     const sessions = JSON.parse(localStorage.getItem('lt_sessions') || '[]');
     const sessionIndex = sessions.findIndex((s: Session) => s.id === sessionId);
     if (sessionIndex === -1) throw new Error('Session not found.');
@@ -413,18 +278,11 @@ export const db = {
 
   // --- QUESTIONS BOARD ---
   async getQuestions(): Promise<Question[]> {
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('questions')
-        .select('*')
-        .order('createdAt', { ascending: false });
-      if (!error && data) return data as Question[];
-    }
     return JSON.parse(localStorage.getItem('lt_questions') || '[]');
   },
 
   async addQuestion(title: string, content: string, subject: string, studentId: string, studentName: string): Promise<Question> {
-    const id = 'q-' + Math.random().toString(36).substr(2, 9);
+    const id = 'q-' + Math.random().toString(36).substring(2, 11);
     const newQuestion: Question = {
       id,
       studentId,
@@ -437,21 +295,11 @@ export const db = {
       replies: []
     };
 
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('questions')
-        .insert([newQuestion])
-        .select()
-        .single();
-      if (!error && data) return data as Question;
-    }
-
-    // Local Storage Fallback
     const questions = JSON.parse(localStorage.getItem('lt_questions') || '[]');
     questions.unshift(newQuestion);
     localStorage.setItem('lt_questions', JSON.stringify(questions));
 
-    // Automated tutor response after 3 seconds for a responsive mock feeling
+    // Automated tutor response after 4 seconds for a responsive mock feeling
     setTimeout(() => {
       this.simulateTutorReply(id, subject);
     }, 4000);
@@ -461,20 +309,13 @@ export const db = {
 
   async addReply(questionId: string, authorName: string, authorRole: 'student' | 'tutor' | 'admin', content: string): Promise<Reply> {
     const newReply: Reply = {
-      id: 'rep-' + Math.random().toString(36).substr(2, 9),
+      id: 'rep-' + Math.random().toString(36).substring(2, 11),
       authorName,
       authorRole,
       content,
       createdAt: new Date().toISOString()
     };
 
-    if (isSupabaseConfigured && supabase) {
-      // Since replies is a nested array in our model (or a secondary table)
-      // In full Supabase schema we would have a replies table. We simulate it here
-      // by appending to the questions array for simplicity
-    }
-
-    // Local Storage Fallback
     const questions = JSON.parse(localStorage.getItem('lt_questions') || '[]');
     const qIndex = questions.findIndex((q: Question) => q.id === questionId);
     if (qIndex !== -1) {
@@ -509,15 +350,6 @@ export const db = {
 
   // --- NOTIFICATIONS ---
   async getNotifications(userId: string): Promise<Notification[]> {
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .or(`userId.eq.${userId},userId.eq.any`)
-        .order('createdAt', { ascending: false });
-      if (!error && data) return data as Notification[];
-    }
-
     const notifications = JSON.parse(localStorage.getItem('lt_notifications') || '[]');
     return notifications
       .filter((n: Notification) => n.userId === userId || n.userId === 'any')
@@ -525,13 +357,6 @@ export const db = {
   },
 
   async markNotificationAsRead(notificationId: string): Promise<void> {
-    if (isSupabaseConfigured && supabase) {
-      await supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('id', notificationId);
-    }
-
     const notifications = JSON.parse(localStorage.getItem('lt_notifications') || '[]');
     const nIndex = notifications.findIndex((n: Notification) => n.id === notificationId);
     if (nIndex !== -1) {
@@ -542,7 +367,7 @@ export const db = {
 
   addNotification(userId: string, title: string, message: string, type: 'booking' | 'payment' | 'question' | 'system'): Notification {
     const newNotif: Notification = {
-      id: 'notif-' + Math.random().toString(36).substr(2, 9),
+      id: 'notif-' + Math.random().toString(36).substring(2, 11),
       userId,
       title,
       message,

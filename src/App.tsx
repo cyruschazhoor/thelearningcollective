@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { db, isSupabaseConfigured } from './lib/db';
+import { db } from './lib/db';
 import { User, Tutor, Session, Question, Notification } from './types';
 import { 
   Sparkles, 
@@ -201,30 +201,23 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#faf9f6] text-neutral-900 font-sans flex flex-col relative selection:bg-yellow-200">
       
-      {/* Top Banner: Supabase status & guides */}
-      <div className="bg-[#2D3A30] text-[#E6E2D3] py-2.5 px-4 text-xs font-semibold flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E2D3]/10">
+      {/* Top Banner: Azure status & guides */}
+      <div className="bg-[#1e293b] text-[#E6E2D3] py-2.5 px-4 text-xs font-semibold flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E2D3]/10">
         <div className="flex items-center gap-2">
-          {isSupabaseConfigured ? (
-            <span className="flex items-center gap-1.5 text-emerald-400">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              ⚡ Connected to Supabase Database
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-[#E7AB79]">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#E7AB79]" />
-              💾 Running in Sandbox Local Preview Mode (Persistent LocalStorage)
-            </span>
-          )}
+          <span className="flex items-center gap-1.5 text-sky-400">
+            <span className="w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse" />
+            ☁️ Azure Cloud Deployment Ready
+          </span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="hidden sm:inline text-[#9A9483]">Deploying via GitHub Actions? Add secrets to connect real Supabase!</span>
+          <span className="hidden sm:inline text-slate-400">Source code linked & continuously deployed via GitHub Actions</span>
           <a 
-            href="https://supabase.com" 
+            href="https://portal.azure.com" 
             target="_blank" 
             rel="noreferrer" 
             className="text-white font-bold hover:underline inline-flex items-center gap-1"
           >
-            Supabase Setup <ExternalLink className="w-3.5 h-3.5" />
+            Azure Portal <ExternalLink className="w-3.5 h-3.5" />
           </a>
         </div>
       </div>
@@ -821,7 +814,7 @@ export default function App() {
             <span className="hover:text-[#A25B5B] cursor-pointer">Coordinator Portal</span>
           </div>
           <p className="text-[10px] text-[#9A9483] font-semibold leading-relaxed">
-            © 2026 The Learning Collective. Designed with a bright doodle learning aesthetic. Powered securely by Supabase.
+            © 2026 The Learning Collective. Designed with a bright doodle learning aesthetic. Powered securely by Azure Cloud.
           </p>
         </div>
       </footer>
